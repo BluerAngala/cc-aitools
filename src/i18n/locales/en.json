@@ -1,7 +1,7 @@
 {
   "app": {
     "title": "CC AITools",
-    "description": "All-in-One Assistant for Claude Code, Codex & Gemini CLI"
+    "description": "基于 cc-switch 二次开发的 AI 工具管理助手"
   },
   "common": {
     "add": "Add",

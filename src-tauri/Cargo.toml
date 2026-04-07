@@ -1,7 +1,7 @@
 [package]
 name = "cc-aitools"
-version = "3.12.3"
-description = "All-in-One Assistant for Claude Code, Codex & Gemini CLI"
+version = "1.0.0"
+description = "基于 cc-switch 二次开发的 AI 工具管理助手"
 authors = ["BluerAngala"]
 license = "MIT"
 repository = "https://github.com/BluerAngala/cc-aitools"
