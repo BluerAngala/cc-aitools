@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=CC Switch
+Name=CC AITools
 Comment=All-in-One Assistant for Claude Code, Codex & Gemini CLI
-Exec=cc-switch
-Icon=com.ccswitch.desktop
+Exec=cc-aitools
+Icon=com.ccaitools.desktop
 Terminal=false
 Categories=Utility;Development;
 StartupNotify=true

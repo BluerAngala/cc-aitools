@@ -11,7 +11,7 @@ interface AppSwitcherProps {
 }
 
 const ALL_APPS: AppId[] = ["claude", "codex", "gemini", "opencode", "openclaw"];
-const STORAGE_KEY = "cc-switch-last-app";
+const STORAGE_KEY = "cc-aitools-last-app";
 
 export function AppSwitcher({
   activeApp,

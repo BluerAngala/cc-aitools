@@ -1,5 +1,5 @@
 {
-  "name": "cc-switch",
+  "name": "cc-aitools",
   "version": "3.12.3",
   "description": "All-in-One Assistant for Claude Code, Codex & Gemini CLI",
   "type": "module",
@@ -16,7 +16,7 @@
     "test:unit:watch": "vitest watch"
   },
   "keywords": [],
-  "author": "Jason Young",
+  "author": "BluerAngala",
   "license": "MIT",
   "devDependencies": {
     "@tauri-apps/cli": "^2.8.0",

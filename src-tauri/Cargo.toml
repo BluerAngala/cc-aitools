@@ -1,10 +1,10 @@
 [package]
-name = "cc-switch"
+name = "cc-aitools"
 version = "3.12.3"
 description = "All-in-One Assistant for Claude Code, Codex & Gemini CLI"
-authors = ["Jason Young"]
+authors = ["BluerAngala"]
 license = "MIT"
-repository = "https://github.com/farion1231/cc-switch"
+repository = "https://github.com/BluerAngala/cc-aitools"
 edition = "2021"
 rust-version = "1.85.0"
 
