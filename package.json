@@ -1,7 +1,7 @@
 {
   "name": "cc-aitools",
   "version": "1.0.0",
-  "description": "All-in-One Assistant for Claude Code, Codex & Gemini CLI",
+  "description": "基于 cc-switch 二次开发的AI工具助手",
   "type": "module",
   "scripts": {
     "dev": "pnpm tauri dev",
