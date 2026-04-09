@@ -384,6 +384,18 @@ export function ProviderList({
 
   return (
     <div className="mt-4 space-y-4">
+      {/* 添加供应商按钮 - 放在最上方 */}
+      {onCreate && (
+        <Button
+          variant="outline"
+          className="w-full border-dashed"
+          onClick={onCreate}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          {t("provider.addProvider", { defaultValue: "添加供应商" })}
+        </Button>
+      )}
+
       <AnimatePresence>
         {isSearchOpen && (
           <motion.div
@@ -456,18 +468,6 @@ export function ProviderList({
         </div>
       ) : (
         renderProviderList()
-      )}
-
-      {/* 添加供应商按钮 */}
-      {onCreate && (
-        <Button
-          variant="outline"
-          className="w-full mt-4 border-dashed"
-          onClick={onCreate}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          {t("provider.addProvider", { defaultValue: "添加供应商" })}
-        </Button>
       )}
 
       <ConfirmDialog
