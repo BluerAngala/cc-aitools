@@ -139,6 +139,7 @@
     "sortUpdated": "排序已更新",
     "usageSaved": "用量查询配置已保存",
     "usageSaveFailed": "用量查询配置保存失败",
+    "duplicateLiveIdsLoadFailed": "读取配置中的供应商标识失败，请先修复配置后再试",
     "geminiConfig": "Gemini 配置",
     "geminiConfigHint": "使用 .env 格式配置 Gemini",
     "form": {
@@ -1987,7 +1988,10 @@
       "startFailed": "启动代理服务失败: {{detail}}"
     },
     "stoppedWithRestore": "代理服务已关闭，已恢复所有接管配置",
-    "stopWithRestoreFailed": "停止失败: {{detail}}"
+    "stopWithRestoreFailed": "停止失败: {{detail}}",
+    "status": {
+      "running": "代理运行中"
+    }
   },
   "streamCheck": {
     "configSaved": "健康检查配置已保存",
@@ -2296,5 +2300,16 @@
     "expiredHint": "请运行 {{tool}} 命令刷新登录",
     "queryFailed": "查询失败",
     "refresh": "刷新"
+  },
+  "nav": {
+    "providers": "供应商",
+    "skills": "Skills",
+    "prompts": "提示词",
+    "mcp": "MCP",
+    "agents": "Agents",
+    "sessions": "会话",
+    "workspace": "工作区",
+    "env": "环境变量",
+    "tools": "工具"
   }
 }

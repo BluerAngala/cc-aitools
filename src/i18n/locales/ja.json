@@ -139,6 +139,7 @@
     "sortUpdated": "並び順を更新しました",
     "usageSaved": "利用状況の設定を保存しました",
     "usageSaveFailed": "利用状況設定の保存に失敗しました",
+    "duplicateLiveIdsLoadFailed": "設定からプロバイダー識別子の読み取りに失敗しました。設定を修正してから再試行してください",
     "geminiConfig": "Gemini 設定",
     "geminiConfigHint": ".env 形式で Gemini を設定してください",
     "form": {
@@ -1987,7 +1988,10 @@
       "startFailed": "プロキシサービスの開始に失敗しました: {{detail}}"
     },
     "stoppedWithRestore": "プロキシサービスが停止し、すべてのテイクオーバー設定が復元されました",
-    "stopWithRestoreFailed": "停止に失敗しました: {{detail}}"
+    "stopWithRestoreFailed": "停止に失敗しました: {{detail}}",
+    "status": {
+      "running": "代理运行中"
+    }
   },
   "streamCheck": {
     "configSaved": "ヘルスチェック設定を保存しました",
@@ -2296,5 +2300,16 @@
     "expiredHint": "{{tool}}コマンドを実行してログインを更新してください",
     "queryFailed": "クエリに失敗しました",
     "refresh": "更新"
+  },
+  "nav": {
+    "providers": "供应商",
+    "skills": "Skills",
+    "prompts": "提示词",
+    "mcp": "MCP",
+    "agents": "Agents",
+    "sessions": "会话",
+    "workspace": "工作区",
+    "env": "环境变量",
+    "tools": "工具"
   }
 }

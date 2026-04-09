@@ -139,6 +139,7 @@
     "sortUpdated": "Sort order updated",
     "usageSaved": "Usage query configuration saved",
     "usageSaveFailed": "Failed to save usage query configuration",
+    "duplicateLiveIdsLoadFailed": "Failed to read provider identifiers from config, please fix the config before trying again",
     "geminiConfig": "Gemini Configuration",
     "geminiConfigHint": "Use .env format to configure Gemini",
     "form": {
@@ -1987,7 +1988,10 @@
       "startFailed": "Failed to start proxy service: {{detail}}"
     },
     "stoppedWithRestore": "Proxy service stopped, all takeover configs restored",
-    "stopWithRestoreFailed": "Stop failed: {{detail}}"
+    "stopWithRestoreFailed": "Stop failed: {{detail}}",
+    "status": {
+      "running": "代理运行中"
+    }
   },
   "streamCheck": {
     "configSaved": "Health check config saved",
@@ -2296,5 +2300,16 @@
     "expiredHint": "Run the {{tool}} command to refresh your login",
     "queryFailed": "Query failed",
     "refresh": "Refresh"
+  },
+  "nav": {
+    "providers": "供应商",
+    "skills": "Skills",
+    "prompts": "提示词",
+    "mcp": "MCP",
+    "agents": "Agents",
+    "sessions": "会话",
+    "workspace": "工作区",
+    "env": "环境变量",
+    "tools": "工具"
   }
 }
