@@ -408,34 +408,42 @@ export function ProviderForm({
   );
 
   const presetEntries = useMemo(() => {
+    let entries: PresetEntry[] = [];
     if (appId === "codex") {
-      return codexProviderPresets.map<PresetEntry>((preset, index) => ({
+      entries = codexProviderPresets.map<PresetEntry>((preset, index) => ({
         id: `codex-${index}`,
         preset,
       }));
     } else if (appId === "gemini") {
-      return geminiProviderPresets.map<PresetEntry>((preset, index) => ({
+      entries = geminiProviderPresets.map<PresetEntry>((preset, index) => ({
         id: `gemini-${index}`,
         preset,
       }));
     } else if (appId === "opencode") {
-      return opencodeProviderPresets.map<PresetEntry>((preset, index) => ({
+      entries = opencodeProviderPresets.map<PresetEntry>((preset, index) => ({
         id: `opencode-${index}`,
         preset,
       }));
     } else if (appId === "openclaw") {
-      return openclawProviderPresets.map<PresetEntry>((preset, index) => ({
+      entries = openclawProviderPresets.map<PresetEntry>((preset, index) => ({
         id: `openclaw-${index}`,
         preset,
       }));
+    } else {
+      entries = providerPresets
+        .filter((p) => !p.hidden)
+        .map<PresetEntry>((preset, index) => ({
+          id: `claude-${index}`,
+          preset,
+        }));
     }
-    return providerPresets
-      .filter((p) => !p.hidden)
-      .map<PresetEntry>((preset, index) => ({
-        id: `claude-${index}`,
-        preset,
-      }));
-  }, [appId]);
+    // 按名称字母顺序排序
+    return entries.sort((a, b) => {
+      const nameA = a.preset.nameKey ? t(a.preset.nameKey) : a.preset.name;
+      const nameB = b.preset.nameKey ? t(b.preset.nameKey) : b.preset.name;
+      return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
+    });
+  }, [appId, t]);
 
   const {
     templateValues,
@@ -1331,6 +1339,7 @@ export function ProviderForm({
             onUniversalPresetSelect={onUniversalPresetSelect}
             onManageUniversalProviders={onManageUniversalProviders}
             category={category}
+            flatPresets={presetEntries}
           />
         )}
 

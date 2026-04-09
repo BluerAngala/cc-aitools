@@ -1,7 +1,15 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FormLabel } from "@/components/ui/form";
 import { ClaudeIcon, CodexIcon, GeminiIcon } from "@/components/BrandIcons";
-import { Zap, Star, Layers, Settings2 } from "lucide-react";
+import {
+  Zap,
+  Star,
+  Layers,
+  Settings2,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import type { ProviderPreset } from "@/config/claudeProviderPresets";
 import type { CodexProviderPreset } from "@/config/codexProviderPresets";
 import type { GeminiProviderPreset } from "@/config/geminiProviderPresets";
@@ -11,6 +19,7 @@ import {
   type UniversalProviderPreset,
 } from "@/config/universalProviderPresets";
 import { ProviderIcon } from "@/components/ProviderIcon";
+import { Button } from "@/components/ui/button";
 
 type PresetEntry = {
   id: string;
@@ -26,6 +35,8 @@ interface ProviderPresetSelectorProps {
   onUniversalPresetSelect?: (preset: UniversalProviderPreset) => void;
   onManageUniversalProviders?: () => void;
   category?: ProviderCategory; // 当前选中的分类
+  // 新增：扁平化的预设列表（用于按字母排序显示）
+  flatPresets?: PresetEntry[];
 }
 
 export function ProviderPresetSelector({
@@ -37,8 +48,20 @@ export function ProviderPresetSelector({
   onUniversalPresetSelect,
   onManageUniversalProviders,
   category,
+  flatPresets,
 }: ProviderPresetSelectorProps) {
   const { t } = useTranslation();
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // 默认显示的预设数量
+  const DEFAULT_VISIBLE_COUNT = 30;
+
+  // 获取要显示的预设列表
+  const presetsToShow = flatPresets || [];
+  const hasMorePresets = presetsToShow.length > DEFAULT_VISIBLE_COUNT;
+  const visiblePresets = isExpanded
+    ? presetsToShow
+    : presetsToShow.slice(0, DEFAULT_VISIBLE_COUNT);
 
   const getCategoryHint = (): React.ReactNode => {
     switch (category) {
@@ -77,6 +100,19 @@ export function ProviderPresetSelector({
   const renderPresetIcon = (
     preset: ProviderPreset | CodexProviderPreset | GeminiProviderPreset,
   ) => {
+    // 优先使用预设的 icon 字段（ProviderIcon 组件）
+    if (preset.icon) {
+      return (
+        <ProviderIcon
+          icon={preset.icon}
+          name={preset.name}
+          size={16}
+          showFallback={false}
+        />
+      );
+    }
+
+    // 兼容旧的 theme.icon 配置
     const iconType = preset.theme?.icon;
     if (!iconType) return null;
 
@@ -141,36 +177,91 @@ export function ProviderPresetSelector({
           {t("providerPreset.custom")}
         </button>
 
-        {categoryKeys.map((category) => {
-          const entries = groupedPresets[category];
-          if (!entries || entries.length === 0) return null;
-          return entries.map((entry) => {
-            const isSelected = selectedPresetId === entry.id;
-            const isPartner = entry.preset.isPartner;
-            return (
-              <button
-                key={entry.id}
-                type="button"
-                onClick={() => onPresetChange(entry.id)}
-                className={`${getPresetButtonClass(isSelected, entry.preset)} relative`}
-                style={getPresetButtonStyle(isSelected, entry.preset)}
-                title={
-                  presetCategoryLabels[category] ?? t("providerPreset.other")
-                }
-              >
-                {renderPresetIcon(entry.preset)}
-                {entry.preset.nameKey
-                  ? t(entry.preset.nameKey)
-                  : entry.preset.name}
-                {isPartner && (
-                  <span className="absolute -top-1 -right-1 flex items-center gap-0.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-500 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-md">
-                    <Star className="h-2.5 w-2.5 fill-current" />
-                  </span>
-                )}
-              </button>
-            );
-          });
-        })}
+        {/* 优先使用 flatPresets（按字母排序），否则使用分组显示 */}
+        {flatPresets
+          ? visiblePresets.map((entry) => {
+              const isSelected = selectedPresetId === entry.id;
+              const isPartner = entry.preset.isPartner;
+              const category = entry.preset.category ?? "others";
+              return (
+                <button
+                  key={entry.id}
+                  type="button"
+                  onClick={() => onPresetChange(entry.id)}
+                  className={`${getPresetButtonClass(isSelected, entry.preset)} relative`}
+                  style={getPresetButtonStyle(isSelected, entry.preset)}
+                  title={
+                    presetCategoryLabels[category] ?? t("providerPreset.other")
+                  }
+                >
+                  {renderPresetIcon(entry.preset)}
+                  {entry.preset.nameKey
+                    ? t(entry.preset.nameKey)
+                    : entry.preset.name}
+                  {isPartner && (
+                    <span className="absolute -top-1 -right-1 flex items-center gap-0.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-500 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-md">
+                      <Star className="h-2.5 w-2.5 fill-current" />
+                    </span>
+                  )}
+                </button>
+              );
+            })
+          : categoryKeys.map((category) => {
+              const entries = groupedPresets[category];
+              if (!entries || entries.length === 0) return null;
+              return entries.map((entry) => {
+                const isSelected = selectedPresetId === entry.id;
+                const isPartner = entry.preset.isPartner;
+                return (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    onClick={() => onPresetChange(entry.id)}
+                    className={`${getPresetButtonClass(isSelected, entry.preset)} relative`}
+                    style={getPresetButtonStyle(isSelected, entry.preset)}
+                    title={
+                      presetCategoryLabels[category] ??
+                      t("providerPreset.other")
+                    }
+                  >
+                    {renderPresetIcon(entry.preset)}
+                    {entry.preset.nameKey
+                      ? t(entry.preset.nameKey)
+                      : entry.preset.name}
+                    {isPartner && (
+                      <span className="absolute -top-1 -right-1 flex items-center gap-0.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-500 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-md">
+                        <Star className="h-2.5 w-2.5 fill-current" />
+                      </span>
+                    )}
+                  </button>
+                );
+              });
+            })}
+
+        {/* 展开/折叠按钮 */}
+        {flatPresets && hasMorePresets && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium border-dashed"
+          >
+            {isExpanded ? (
+              <>
+                <ChevronUp className="h-4 w-4" />
+                {t("providerPreset.collapse", { defaultValue: "收起" })}
+              </>
+            ) : (
+              <>
+                <ChevronDown className="h-4 w-4" />
+                {t("providerPreset.moreProviders", {
+                  defaultValue: "更多供应商",
+                })}
+              </>
+            )}
+          </Button>
+        )}
       </div>
 
       {onUniversalPresetSelect && universalProviderPresets.length > 0 && (

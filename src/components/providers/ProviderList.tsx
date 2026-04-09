@@ -13,7 +13,7 @@ import {
   type CSSProperties,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Search, X } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -456,6 +456,18 @@ export function ProviderList({
         </div>
       ) : (
         renderProviderList()
+      )}
+
+      {/* 添加供应商按钮 */}
+      {onCreate && (
+        <Button
+          variant="outline"
+          className="w-full mt-4 border-dashed"
+          onClick={onCreate}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          {t("provider.addProvider", { defaultValue: "添加供应商" })}
+        </Button>
       )}
 
       <ConfirmDialog
