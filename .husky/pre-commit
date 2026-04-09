@@ -1,0 +1,9 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# 检查并修复 i18n 缺失的 key
+echo "🔍 检查 i18n 翻译..."
+node scripts/i18n-check.js --fix
+
+# 如果有修改，自动添加到提交
+git diff --quiet -- src/i18n/locales/ || git add src/i18n/locales/

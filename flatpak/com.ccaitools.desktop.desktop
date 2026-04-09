@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=CC AITools
+Comment=All-in-One Assistant for Claude Code, Codex & Gemini CLI
+Exec=cc-aitools
+Icon=com.ccaitools.desktop
+Terminal=false
+Categories=Utility;Development;
+StartupNotify=true
