@@ -1121,11 +1121,28 @@ pub fn run() {
         // 处理退出请求（所有平台）
         if let RunEvent::ExitRequested { api, code, .. } = &event {
             // code 为 None 表示运行时自动触发（如隐藏窗口的 WebView 被回收导致无存活窗口），
-            // 此时应仅阻止退出、保持托盘后台运行；
-            // code 为 Some(_) 表示用户主动调用 app.exit() 退出（如托盘菜单"退出"），
-            // 此时执行清理后退出。
+            // code 为 Some(_) 表示用户主动调用 app.exit() 退出（如托盘菜单"退出"）。
             if code.is_none() {
-                log::info!("运行时触发退出请求（无存活窗口），阻止退出以保持托盘后台运行");
+                // 检查主窗口是否存在且可见
+                // 如果窗口已销毁（不是隐藏），说明是终端终止导致的退出，应该直接退出应用
+                // 如果窗口只是隐藏，说明是最小化到托盘，保持后台运行
+                let window_exists = app_handle.get_webview_window("main").is_some();
+                let settings = crate::settings::get_settings();
+
+                if !window_exists || !settings.minimize_to_tray_on_close {
+                    log::info!("主窗口已销毁或最小化到托盘已禁用，执行清理后退出应用");
+                    api.prevent_exit();
+                    let app_handle = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        cleanup_before_exit(&app_handle).await;
+                        log::info!("清理完成，退出应用");
+                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                        std::process::exit(0);
+                    });
+                    return;
+                }
+
+                log::info!("运行时触发退出请求（窗口隐藏中），阻止退出以保持托盘后台运行");
                 api.prevent_exit();
                 return;
             }
