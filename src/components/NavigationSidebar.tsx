@@ -126,7 +126,7 @@ export function NavigationSidebar({
   return (
     <div className="flex flex-col h-full p-3 gap-3">
       {/* Logo 区域 */}
-      <div className="flex items-center justify-between px-2 pt-1">
+      <div className="flex items-center px-2 pt-1">
         <a
           href="https://github.com/BluerAngala/cc-aitools"
           target="_blank"
@@ -140,14 +140,6 @@ export function NavigationSidebar({
         >
           CC AITools
         </a>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => onOpenSettings("general")}
-          className="hover:bg-black/5 dark:hover:bg-white/5"
-        >
-          <Settings className="w-4 h-4" />
-        </Button>
       </div>
 
       {/* 导航菜单 */}
@@ -173,7 +165,7 @@ export function NavigationSidebar({
         </ul>
       </nav>
 
-      {/* 底部状态区 */}
+      {/* 底部状态区和设置按钮 */}
       <div className="flex flex-col gap-2 pt-2 border-t">
         {isProxyRunning && (
           <div className="flex items-center justify-between px-2">
@@ -186,6 +178,16 @@ export function NavigationSidebar({
             </div>
           </div>
         )}
+        <Button
+          variant="ghost"
+          className="w-full justify-center gap-3 hover:bg-accent"
+          onClick={() => onOpenSettings("general")}
+        >
+          <Settings className="w-4 h-4" />
+          <span className="truncate">
+            {t("nav.settings", { defaultValue: "设置" })}
+          </span>
+        </Button>
       </div>
     </div>
   );
