@@ -755,7 +755,7 @@ pub async fn open_provider_terminal(
     let env_vars = extract_env_vars_from_config(config, &app_type);
 
     // 根据平台启动终端，传入提供商ID用于生成唯一的配置文件名
-    launch_terminal_with_env(env_vars, &providerId, launch_cwd.as_deref())
+    launch_terminal_with_env(env_vars, &providerId, launch_cwd.as_deref(), &app_type)
         .map_err(|e| format!("启动终端失败: {e}"))?;
 
     Ok(true)
@@ -808,6 +808,20 @@ fn extract_env_vars_from_config(
         }
     }
 
+    // OpenCode 使用 options.apiKey 和 options.baseURL
+    if *app_type == AppType::OpenCode {
+        if let Some(options) = obj.get("options").and_then(|v| v.as_object()) {
+            // API Key
+            if let Some(api_key) = options.get("apiKey").and_then(|v| v.as_str()) {
+                env_vars.push(("OPENCODE_API_KEY".to_string(), api_key.to_string()));
+            }
+            // Base URL
+            if let Some(base_url) = options.get("baseURL").and_then(|v| v.as_str()) {
+                env_vars.push(("OPENCODE_BASE_URL".to_string(), base_url.to_string()));
+            }
+        }
+    }
+
     env_vars
 }
 
@@ -848,45 +862,6 @@ fn resolve_launch_cwd(cwd: Option<String>) -> Result<Option<PathBuf>, String> {
     Ok(Some(resolved))
 }
 
-/// 创建临时配置文件并启动 claude 终端
-/// 使用 --settings 参数传入提供商特定的 API 配置
-fn launch_terminal_with_env(
-    env_vars: Vec<(String, String)>,
-    provider_id: &str,
-    cwd: Option<&Path>,
-) -> Result<(), String> {
-    let temp_dir = std::env::temp_dir();
-    let config_file = temp_dir.join(format!(
-        "claude_{}_{}.json",
-        provider_id,
-        std::process::id()
-    ));
-
-    // 创建并写入配置文件
-    write_claude_config(&config_file, &env_vars)?;
-
-    #[cfg(target_os = "macos")]
-    {
-        launch_macos_terminal(&config_file, cwd)?;
-        Ok(())
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        launch_linux_terminal(&config_file, cwd)?;
-        Ok(())
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        launch_windows_terminal(&temp_dir, &config_file, cwd)?;
-        return Ok(());
-    }
-
-    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-    Err("不支持的操作系统".to_string())
-}
-
 /// 写入 claude 配置文件
 fn write_claude_config(
     config_file: &std::path::Path,
@@ -907,9 +882,173 @@ fn write_claude_config(
     std::fs::write(config_file, config_json).map_err(|e| format!("写入配置文件失败: {e}"))
 }
 
+/// 写入 OpenCode 配置文件
+/// OpenCode 使用不同的配置结构: providers 对象包含 apiKey 和 baseURL
+fn write_opencode_config(
+    config_file: &std::path::Path,
+    env_vars: &[(String, String)],
+) -> Result<(), String> {
+    let mut config_obj = serde_json::Map::new();
+    let mut providers_obj = serde_json::Map::new();
+    let mut provider_config = serde_json::Map::new();
+
+    // 从环境变量中提取 apiKey 和 baseURL
+    for (key, value) in env_vars {
+        if key == "OPENCODE_API_KEY" {
+            provider_config.insert(
+                "apiKey".to_string(),
+                serde_json::Value::String(value.clone()),
+            );
+        } else if key == "OPENCODE_BASE_URL" {
+            provider_config.insert(
+                "baseURL".to_string(),
+                serde_json::Value::String(value.clone()),
+            );
+        }
+    }
+
+    // 使用自定义提供商名称
+    providers_obj.insert(
+        "custom".to_string(),
+        serde_json::Value::Object(provider_config),
+    );
+    config_obj.insert(
+        "providers".to_string(),
+        serde_json::Value::Object(providers_obj),
+    );
+
+    let config_json =
+        serde_json::to_string_pretty(&config_obj).map_err(|e| format!("序列化配置失败: {e}"))?;
+
+    std::fs::write(config_file, config_json).map_err(|e| format!("写入配置文件失败: {e}"))
+}
+
+/// 创建临时配置文件并启动终端
+/// 使用 --settings 参数传入提供商特定的 API 配置
+fn launch_terminal_with_env(
+    env_vars: Vec<(String, String)>,
+    provider_id: &str,
+    cwd: Option<&Path>,
+    app_type: &AppType,
+) -> Result<(), String> {
+    // 根据应用类型获取 CLI 命令名称和配置文件参数
+    let cli_command = get_cli_command(app_type);
+    let config_arg = get_config_arg(app_type);
+
+    // OpenCode 特殊处理：将配置文件复制到工作目录
+    if *app_type == AppType::OpenCode {
+        return launch_opencode_terminal(&env_vars, cwd, &cli_command);
+    }
+
+    // 其他应用使用临时配置文件
+    let temp_dir = std::env::temp_dir();
+    let config_file = temp_dir.join(format!(
+        "{}_{}_{}.json",
+        app_type.as_str(),
+        provider_id,
+        std::process::id()
+    ));
+
+    write_claude_config(&config_file, &env_vars)?;
+
+    #[cfg(target_os = "macos")]
+    {
+        launch_macos_terminal(&config_file, cwd, &cli_command, config_arg.as_deref())?;
+        Ok(())
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        launch_linux_terminal(&config_file, cwd, &cli_command, config_arg.as_deref())?;
+        Ok(())
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        launch_windows_terminal(
+            &temp_dir,
+            &config_file,
+            cwd,
+            &cli_command,
+            config_arg.as_deref(),
+        )?;
+        return Ok(());
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    Err("不支持的操作系统".to_string())
+}
+
+/// 启动 OpenCode 终端
+/// OpenCode 需要将配置文件放在工作目录或用户配置目录
+fn launch_opencode_terminal(
+    env_vars: &[(String, String)],
+    cwd: Option<&Path>,
+    cli_command: &str,
+) -> Result<(), String> {
+    // 确定配置文件的目标位置
+    let config_path = if let Some(work_dir) = cwd {
+        work_dir.join("opencode.json")
+    } else {
+        std::env::current_dir()
+            .map_err(|e| format!("无法获取当前目录: {e}"))?
+            .join("opencode.json")
+    };
+
+    // 写入 OpenCode 配置文件
+    write_opencode_config(&config_path, env_vars)?;
+
+    #[cfg(target_os = "macos")]
+    {
+        launch_macos_terminal_no_config(cwd, cli_command)?;
+        Ok(())
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        launch_linux_terminal_no_config(cwd, cli_command)?;
+        Ok(())
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        launch_windows_terminal_no_config(cwd, cli_command)?;
+        Ok(())
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    Err("不支持的操作系统".to_string())
+}
+
+/// 根据应用类型获取 CLI 命令名称
+fn get_cli_command(app_type: &AppType) -> String {
+    match app_type {
+        AppType::Claude => "claude".to_string(),
+        AppType::Codex => "codex".to_string(),
+        AppType::Gemini => "gemini".to_string(),
+        AppType::OpenCode => "opencode".to_string(),
+        AppType::OpenClaw => "openclaw".to_string(),
+    }
+}
+
+/// 根据应用类型获取配置文件参数名
+/// 返回 None 表示该应用类型不需要配置文件参数（如 OpenCode）
+fn get_config_arg(app_type: &AppType) -> Option<String> {
+    match app_type {
+        AppType::Claude => Some("--settings".to_string()),
+        AppType::OpenCode => None, // OpenCode 不使用 --config 参数
+        _ => Some("--settings".to_string()), // 默认使用 --settings
+    }
+}
+
 /// macOS: 根据用户首选终端启动
 #[cfg(target_os = "macos")]
-fn launch_macos_terminal(config_file: &std::path::Path, cwd: Option<&Path>) -> Result<(), String> {
+fn launch_macos_terminal(
+    config_file: &std::path::Path,
+    cwd: Option<&Path>,
+    cli_command: &str,
+    config_arg: Option<&str>,
+) -> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
 
     let preferred = crate::settings::get_preferred_terminal();
@@ -920,19 +1059,28 @@ fn launch_macos_terminal(config_file: &std::path::Path, cwd: Option<&Path>) -> R
     let config_path = config_file.to_string_lossy();
     let cd_command = build_shell_cd_command(cwd);
 
+    // 构建命令行
+    let cmd_line = if let Some(arg) = config_arg {
+        format!(r#"{cli_command} {arg} "{config_path}""#)
+    } else {
+        format!(r#"{cli_command}"#)
+    };
+
     // Write the shell script to a temp file
     let script_content = format!(
         r#"#!/bin/bash
 trap 'rm -f "{config_path}" "{script_file}"' EXIT
 {cd_command}
-echo "Using provider-specific claude config:"
+echo "Using provider-specific {cli_command} config:"
 echo "{config_path}"
-claude --settings "{config_path}"
+{cmd_line}
 exec bash --norc --noprofile
 "#,
         config_path = config_path,
         script_file = script_file.display(),
         cd_command = cd_command,
+        cli_command = cli_command,
+        cmd_line = cmd_line,
     );
 
     std::fs::write(&script_file, &script_content).map_err(|e| format!("写入启动脚本失败: {e}"))?;
@@ -950,6 +1098,61 @@ exec bash --norc --noprofile
         "ghostty" => launch_macos_open_app("Ghostty", &script_file, true),
         "wezterm" => launch_macos_open_app("WezTerm", &script_file, true),
         _ => launch_macos_terminal_app(&script_file), // "terminal" or default
+    };
+
+    // If preferred terminal fails and it's not the default, try Terminal.app as fallback
+    if result.is_err() && terminal != "terminal" {
+        log::warn!(
+            "首选终端 {} 启动失败，回退到 Terminal.app: {:?}",
+            terminal,
+            result.as_ref().err()
+        );
+        return launch_macos_terminal_app(&script_file);
+    }
+
+    result
+}
+
+/// macOS: 不带配置文件的终端启动（用于 OpenCode）
+#[cfg(target_os = "macos")]
+fn launch_macos_terminal_no_config(cwd: Option<&Path>, cli_command: &str) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let preferred = crate::settings::get_preferred_terminal();
+    let terminal = preferred.as_deref().unwrap_or("terminal");
+
+    let temp_dir = std::env::temp_dir();
+    let script_file = temp_dir.join(format!("cc_aitools_launcher_{}.sh", std::process::id()));
+    let cd_command = build_shell_cd_command(cwd);
+
+    // Write the shell script to a temp file
+    let script_content = format!(
+        r#"#!/bin/bash
+trap 'rm -f "{script_file}"' EXIT
+{cd_command}
+echo "Starting {cli_command}..."
+{cli_command}
+exec bash --norc --noprofile
+"#,
+        script_file = script_file.display(),
+        cd_command = cd_command,
+        cli_command = cli_command,
+    );
+
+    std::fs::write(&script_file, &script_content).map_err(|e| format!("写入启动脚本失败: {e}"))?;
+
+    // Make script executable
+    std::fs::set_permissions(&script_file, std::fs::Permissions::from_mode(0o755))
+        .map_err(|e| format!("设置脚本权限失败: {e}"))?;
+
+    // Try the preferred terminal first, fall back to Terminal.app if it fails
+    let result = match terminal {
+        "iterm2" => launch_macos_iterm2(&script_file),
+        "alacritty" => launch_macos_open_app("Alacritty", &script_file, true),
+        "kitty" => launch_macos_open_app("kitty", &script_file, false),
+        "ghostty" => launch_macos_open_app("Ghostty", &script_file, true),
+        "wezterm" => launch_macos_open_app("WezTerm", &script_file, true),
+        _ => launch_macos_terminal_app(&script_file),
     };
 
     // If preferred terminal fails and it's not the default, try Terminal.app as fallback
@@ -1068,7 +1271,12 @@ fn launch_macos_open_app(
 
 /// Linux: 根据用户首选终端启动
 #[cfg(target_os = "linux")]
-fn launch_linux_terminal(config_file: &std::path::Path, cwd: Option<&Path>) -> Result<(), String> {
+fn launch_linux_terminal(
+    config_file: &std::path::Path,
+    cwd: Option<&Path>,
+    cli_command: &str,
+    config_arg: Option<&str>,
+) -> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
     use std::process::Command;
 
@@ -1092,15 +1300,23 @@ fn launch_linux_terminal(config_file: &std::path::Path, cwd: Option<&Path>) -> R
     let config_path = config_file.to_string_lossy();
     let cd_command = build_shell_cd_command(cwd);
 
+    // 构建命令行
+    let cmd_line = if let Some(arg) = config_arg {
+        format!(r#"{cli_command} {arg} "{config_path}""#)
+    } else {
+        format!(r#"{cli_command}"#)
+    };
+
     let script_content = format!(
         r#"#!/bin/bash
 trap 'rm -f "{config_path}" "{script_file}"' EXIT
 {cd_command}
-echo "Using provider-specific claude config:"
+echo "Using provider-specific {cli_command} config:"
 echo "{config_path}"
-claude --settings "{config_path}"
+{cmd_line}
 exec bash --norc --noprofile
 "#,
+        cmd_line = cmd_line,
         config_path = config_path,
         script_file = script_file.display(),
         cd_command = cd_command,
@@ -1177,33 +1393,139 @@ fn which_command(cmd: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// Linux: 不带配置文件的终端启动（用于 OpenCode）
+#[cfg(target_os = "linux")]
+fn launch_linux_terminal_no_config(cwd: Option<&Path>, cli_command: &str) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    use std::process::Command;
+
+    let preferred = crate::settings::get_preferred_terminal();
+
+    // Default terminal list with their arguments
+    let default_terminals = [
+        ("gnome-terminal", vec!["--"]),
+        ("konsole", vec!["-e"]),
+        ("xfce4-terminal", vec!["-e"]),
+        ("mate-terminal", vec!["--"]),
+        ("lxterminal", vec!["-e"]),
+        ("alacritty", vec!["-e"]),
+        ("kitty", vec!["-e"]),
+        ("ghostty", vec!["-e"]),
+    ];
+
+    // Create temp script file
+    let temp_dir = std::env::temp_dir();
+    let script_file = temp_dir.join(format!("cc_aitools_launcher_{}.sh", std::process::id()));
+    let cd_command = build_shell_cd_command(cwd);
+
+    let script_content = format!(
+        r#"#!/bin/bash
+trap 'rm -f "{script_file}"' EXIT
+{cd_command}
+echo "Starting {cli_command}..."
+{cli_command}
+exec bash --norc --noprofile
+"#,
+        cli_command = cli_command,
+        script_file = script_file.display(),
+        cd_command = cd_command,
+    );
+
+    std::fs::write(&script_file, &script_content).map_err(|e| format!("写入启动脚本失败: {e}"))?;
+
+    std::fs::set_permissions(&script_file, std::fs::Permissions::from_mode(0o755))
+        .map_err(|e| format!("设置脚本权限失败: {e}"))?;
+
+    // Build terminal list: preferred terminal first (if specified), then defaults
+    let terminals_to_try: Vec<(&str, Vec<&str>)> = if let Some(ref pref) = preferred {
+        let pref_args = default_terminals
+            .iter()
+            .find(|(name, _)| *name == pref.as_str())
+            .map(|(_, args)| args.to_vec())
+            .unwrap_or_else(|| vec!["-e"]);
+
+        let mut list = vec![(pref.as_str(), pref_args)];
+        for (name, args) in &default_terminals {
+            if *name != pref.as_str() {
+                list.push((*name, args.to_vec()));
+            }
+        }
+        list
+    } else {
+        default_terminals
+            .iter()
+            .map(|(name, args)| (*name, args.to_vec()))
+            .collect()
+    };
+
+    let mut last_error = "未找到可用的终端".to_string();
+
+    for (terminal, args) in terminals_to_try {
+        let terminal_exists = std::path::Path::new(&format!("/usr/bin/{}", terminal)).exists()
+            || std::path::Path::new(&format!("/bin/{}", terminal)).exists()
+            || std::path::Path::new(&format!("/usr/local/bin/{}", terminal)).exists()
+            || which_command(terminal);
+
+        if terminal_exists {
+            let result = Command::new(terminal)
+                .args(&args)
+                .arg("bash")
+                .arg(script_file.to_string_lossy().as_ref())
+                .spawn();
+
+            match result {
+                Ok(_) => return Ok(()),
+                Err(e) => {
+                    last_error = format!("执行 {} 失败: {}", terminal, e);
+                }
+            }
+        }
+    }
+
+    let _ = std::fs::remove_file(&script_file);
+    Err(last_error)
+}
+
 /// Windows: 根据用户首选终端启动
 #[cfg(target_os = "windows")]
 fn launch_windows_terminal(
     temp_dir: &std::path::Path,
     config_file: &std::path::Path,
     cwd: Option<&Path>,
+    cli_command: &str,
+    config_arg: Option<&str>,
 ) -> Result<(), String> {
     let preferred = crate::settings::get_preferred_terminal();
     let terminal = preferred.as_deref().unwrap_or("cmd");
 
-    let bat_file = temp_dir.join(format!("cc_aitools_claude_{}.bat", std::process::id()));
+    let bat_file = temp_dir.join(format!(
+        "cc_aitools_{}_{}.bat",
+        cli_command,
+        std::process::id()
+    ));
     let config_path_for_batch = escape_windows_batch_value(&config_file.to_string_lossy());
     let cwd_command = build_windows_cwd_command(cwd);
+
+    // 构建命令行
+    let cmd_line = if let Some(arg) = config_arg {
+        format!(r#"{cli_command} {arg} "{config_path_for_batch}""#)
+    } else {
+        format!(r#"{cli_command}"#)
+    };
 
     let content = format!(
         "@echo off
 {cwd_command}
-echo Using provider-specific claude config:
+echo Using provider-specific {cli_command} config:
 echo {}
-claude --settings \"{}\"
+{cmd_line}
 del \"{}\" >nul 2>&1
 del \"%~f0\" >nul 2>&1
 ",
         config_path_for_batch,
         config_path_for_batch,
-        config_path_for_batch,
         cwd_command = cwd_command,
+        cmd_line = cmd_line,
     );
 
     std::fs::write(&bat_file, &content).map_err(|e| format!("写入批处理文件失败: {e}"))?;
@@ -1219,6 +1541,59 @@ del \"%~f0\" >nul 2>&1
         ),
         "wt" => run_windows_start_command(&["wt", "cmd", "/K", &bat_path], "Windows Terminal"),
         _ => run_windows_start_command(&["cmd", "/K", &bat_path], "cmd"), // "cmd" or default
+    };
+
+    // If preferred terminal fails and it's not the default, try cmd as fallback
+    if result.is_err() && terminal != "cmd" {
+        log::warn!(
+            "首选终端 {} 启动失败，回退到 cmd: {:?}",
+            terminal,
+            result.as_ref().err()
+        );
+        return run_windows_start_command(&["cmd", "/K", &bat_path], "cmd");
+    }
+
+    result
+}
+
+/// Windows: 不带配置文件的终端启动（用于 OpenCode）
+#[cfg(target_os = "windows")]
+fn launch_windows_terminal_no_config(cwd: Option<&Path>, cli_command: &str) -> Result<(), String> {
+    let preferred = crate::settings::get_preferred_terminal();
+    let terminal = preferred.as_deref().unwrap_or("cmd");
+
+    let temp_dir = std::env::temp_dir();
+    let bat_file = temp_dir.join(format!(
+        "cc_aitools_{}_{}.bat",
+        cli_command,
+        std::process::id()
+    ));
+    let cwd_command = build_windows_cwd_command(cwd);
+
+    let content = format!(
+        "@echo off
+{cwd_command}
+echo Starting {cli_command}...
+{cli_command}
+del \"%~f0\" >nul 2>&1
+",
+        cwd_command = cwd_command,
+        cli_command = cli_command,
+    );
+
+    std::fs::write(&bat_file, &content).map_err(|e| format!("写入批处理文件失败: {e}"))?;
+
+    let bat_path = bat_file.to_string_lossy();
+    let ps_cmd = format!("& '{}'", bat_path);
+
+    // Try the preferred terminal first
+    let result = match terminal {
+        "powershell" => run_windows_start_command(
+            &["powershell", "-NoExit", "-Command", &ps_cmd],
+            "PowerShell",
+        ),
+        "wt" => run_windows_start_command(&["wt", "cmd", "/K", &bat_path], "Windows Terminal"),
+        _ => run_windows_start_command(&["cmd", "/K", &bat_path], "cmd"),
     };
 
     // If preferred terminal fails and it's not the default, try cmd as fallback
